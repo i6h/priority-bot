@@ -19,7 +19,7 @@
 
 - **<a href="https://discord.js.org/" target="_blank">discord.js</a>**: A powerful Node.js module that allows you to interact with the Discord API, enabling rich functionality for managing roles and handling server events.
 - **<a href="https://pnpm.io/" target="_blank">pnpm</a>**: Recommended for faster and more efficient dependency management.
-- **<a href="https://github.com/Re2team/connectqueue" target="_blank">connectqueue</a>**: For better performance, especially in high-traffic Discord servers, using the `connectqueue` system is recommended to manage and process tasks in a queue efficiently.
+- **<a href="https://github.com/i6h/connectqueue" target="_blank">connectqueue</a>**: For improved compatibility, especially with various Discord setups, using the `connectqueue` system is recommended to manage and process tasks in a queue efficiently.
 
 ## 🚀 Installation
 
@@ -87,7 +87,7 @@
 
 5. **Optional: Set up the `connectqueue` system**:
 
-    For better compatibility with various Discord setups, integrate the `connectqueue` system. Follow the instructions on the <a href="https://github.com/Re2team/connectqueue" target="_blank">connectqueue GitHub page</a> to set it up.
+    For better compatibility with various Discord setups, integrate the `connectqueue` system. Follow the instructions on the <a href="https://github.com/i6h/connectqueue" target="_blank">connectqueue GitHub page</a> to set it up.
 
 
 6. **Run the bot**:
