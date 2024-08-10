@@ -9,10 +9,10 @@ importers:
   .:
     dependencies:
       '@discordjs/builders':
-        specifier: ^1.8.1
+        specifier: ^1.8.2
         version: 1.8.2
       discord.js:
-        specifier: ^14.15.2
+        specifier: ^14.15.3
         version: 14.15.3
       dotenv:
         specifier: ^16.4.5

@@ -3,10 +3,15 @@ const fs = require('fs');
 const cron = require('node-cron');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const config = require('./config');
+const https = require('https'); 
 
 const { clientId, guildId, token, webhookUrl, commandsLocked, allowedRoles, roles } = config;
 
-// Initialize Discord client with required intents
+if (!clientId || !guildId || !token || !webhookUrl) {
+    console.error('Error: One or more configuration variables (clientId, guildId, token, webhookUrl) are missing. The bot will not start.');
+    process.exit(1);
+}
+
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds, 
@@ -16,7 +21,6 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates 
     ] 
 });
-
 const dataFilePath = './data.json'; 
 const webhookClient = new WebhookClient({ url: webhookUrl }); 
 

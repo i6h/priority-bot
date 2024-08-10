@@ -1,7 +1,7 @@
 {
   "name": "priority-bot",
   "author": "Lion",
-  "version": "1.0.0",
+  "version": "v1.0.1",
   "description": "A Discord bot for managing temporary priority roles with automatic tracking and webhook logging.",
   "license": "MIT",
   "main": "src/main.js",
@@ -10,8 +10,8 @@
   },
   "keywords": [],
   "dependencies": {
-    "@discordjs/builders": "^1.8.1",
-    "discord.js": "^14.15.2",
+    "@discordjs/builders": "^1.8.2",
+    "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
     "node-cron": "^3.0.3"
   }
