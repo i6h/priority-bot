@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "description": "A Discord bot for managing temporary priority roles with automatic tracking and webhook logging.",
   "license": "MIT",
-  "main": "index.js",
+  "main": "src/main.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node src/main.js"
   },
   "keywords": [],
   "dependencies": {
