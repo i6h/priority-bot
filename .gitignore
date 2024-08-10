@@ -1,0 +1,8 @@
+# Node modules directory
+node_modules/
+
+# Environment variables file
+.env
+
+# Data files
+data.json
