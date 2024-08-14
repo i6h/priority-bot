@@ -218,11 +218,22 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.reply("Guild not found.");
     }
 
+    // Check if bot has manage roles permission
+    if (!guild.members.me.permissions.has('MANAGE_ROLES')) {
+      return interaction.reply('I do not have permission to manage roles.');
+    }
+
     const member = await guild.members.fetch(user.id);
     const role = guild.roles.cache.get(roleId);
 
     if (!member || !role) {
       return interaction.reply("Invalid priority or role.");
+    }
+
+    // Check if the bot's highest role is higher than the role to assign
+    const botHighestRole = guild.members.me.roles.highest;
+    if (botHighestRole.position <= role.position) {
+      return interaction.reply(`I cannot assign the ${role.name} role because it is higher than or equal to my highest role.`);
     }
 
     if (data[user.id]) {
@@ -263,6 +274,11 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.reply("Guild not found.");
     }
 
+    // Check if bot has manage roles permission
+    if (!guild.members.me.permissions.has('MANAGE_ROLES')) {
+      return interaction.reply('I do not have permission to manage roles.');
+    }
+
     const member = await guild.members.fetch(user.id);
 
     if (!data[user.id]) {
@@ -276,6 +292,12 @@ client.on("interactionCreate", async (interaction) => {
 
     if (!role) {
       return interaction.reply("Priority not found.");
+    }
+
+    // Check if the bot's highest role is higher than the role to remove
+    const botHighestRole = guild.members.me.roles.highest;
+    if (botHighestRole.position <= role.position) {
+      return interaction.reply(`I cannot remove the ${role.name} role because it is higher than or equal to my highest role.`);
     }
 
     await member.roles.remove(role);
