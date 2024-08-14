@@ -1,5 +1,10 @@
 # Priority Bot 🚀
 
+<!-- ![Total Downloads](https://img.shields.io/github/downloads/i6h/priority-bot/total?logo=github)
+![Latest Downloads](https://img.shields.io/github/downloads/i6h/priority-bot/latest/total?logo=github)
+![Contributors](https://img.shields.io/github/contributors/i6h/priority-bot?logo=github)
+![Latest Release](https://img.shields.io/github/v/release/i6h/priority-bot?logo=github) -->
+
 **Priority Bot** is a powerful Discord bot designed to help server admins manage temporary priority roles with ease. Whether you need to grant temporary access to certain channels or manage special roles that expire after a set time, Priority Bot automates the entire process, making your server management more efficient.
 
 ## ✨ Features
