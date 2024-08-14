@@ -1,15 +1,11 @@
 # Priority Bot 🚀
 
-<!-- ![Total Downloads](https://img.shields.io/github/downloads/i6h/priority-bot/total?logo=github)
-![Latest Downloads](https://img.shields.io/github/downloads/i6h/priority-bot/latest/total?logo=github)
-![Contributors](https://img.shields.io/github/contributors/i6h/priority-bot?logo=github)
-![Latest Release](https://img.shields.io/github/v/release/i6h/priority-bot?logo=github) -->
-
 **Priority Bot** is a powerful Discord bot designed to help server admins manage temporary priority roles with ease. Whether you need to grant temporary access to certain channels or manage special roles that expire after a set time, Priority Bot automates the entire process, making your server management more efficient.
 
 ## ✨ Features
 
 - **Assign Priority Roles**: Easily assign temporary roles to users with slash commands.
+- **Check Player Status**: Quickly check the current priority status and expiration time for any user.
 - **Automatic Role Removal**: Automatically removes roles once the assigned time expires.
 - **Logging**: Logs significant actions and updates to a specified webhook.
 - **Update Checks**: Automatically checks for bot updates and notifies you via webhook.
@@ -17,9 +13,9 @@
 
 ## 🛠️ Technology Stack
 
-- **<a href="https://discord.js.org/" target="_blank">discord.js</a>**: A powerful Node.js module that allows you to interact with the Discord API, enabling rich functionality for managing roles and handling server events.
-- **<a href="https://pnpm.io/" target="_blank">pnpm</a>**: Recommended for faster and more efficient dependency management.
-- **<a href="https://github.com/Re2team/connectqueue" target="_blank">connectqueue</a>**: For better performance, especially in high-traffic Discord servers, using the `connectqueue` system is recommended to manage and process tasks in a queue efficiently.
+- **[discord.js](https://discord.js.org/)**: A powerful Node.js module that allows you to interact with the Discord API, enabling rich functionality for managing roles and handling server events.
+- **[pnpm](https://pnpm.io/)**: Recommended for faster and more efficient dependency management.
+- **[connectqueue](https://github.com/Re2team/connectqueue)**: For better performance, especially in high-traffic Discord servers, using the `connectqueue` system is recommended to manage and process tasks in a queue efficiently.
 
 ## 🚀 Installation
 
@@ -87,8 +83,7 @@
 
 5. **Optional: Set up the `connectqueue` system**:
 
-    For better compatibility with various Discord setups, integrate the `connectqueue` system. Follow the instructions on the <a href="https://github.com/Re2team/connectqueue" target="_blank">connectqueue GitHub page</a> to set it up.
-
+    For better compatibility with various Discord setups, integrate the `connectqueue` system. Follow the instructions on the [connectqueue GitHub page](https://github.com/Re2team/connectqueue) to set it up.
 
 6. **Run the bot**:
 
@@ -162,6 +157,21 @@ Priority Bot offers several slash commands to manage roles effectively:
 
   This toggles the command lock state.
 
+### 5. `checkplayer`
+
+**Check the current priority status of a user, including role and remaining time.**
+
+- **Usage**:
+  ```plaintext
+  /checkplayer user:@Username
+  ```
+
+- **Example**:
+  ```plaintext
+  /checkplayer user:@its4lion
+  ```
+  This checks the current priority status of `@its4lion`.
+
 ## 🛡️ Practical Examples
 
 ### Granting Temporary Access
@@ -184,6 +194,14 @@ Use the `/list` command to keep track of who currently has priority roles and wh
 /list page:1
 ```
 
+### Checking Player Status
+
+Quickly check the current status of any user using the `/checkplayer` command:
+
+```plaintext
+/checkplayer user:@Username
+```
+
 ### Command Locking
 
 Toggle the command lock with `/togglelock` to restrict command usage to specific roles (configured in `config.js` under `allowedRoles`). This is useful for ensuring that only trusted users can manage roles.
@@ -204,4 +222,3 @@ If you have any questions, suggestions, or feedback, feel free to reach out:
 - **GitHub**: Open an issue or submit a pull request.
 
 When contacting or opening an issue, please provide as much detail as possible to help us assist you better.
-
