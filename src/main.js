@@ -10,17 +10,22 @@ const fs = require("fs");
 const cron = require("node-cron");
 const { SlashCommandBuilder } = require("@discordjs/builders");
 const https = require("https");
+const path = require('path');
+
+// Load the config
 const config = require("./config");
 
+// Destructure the config values
 const {
   clientId,
   guildId,
   token,
   webhookUrl,
-  commandsLocked,
   allowedRoles,
   roles,
 } = config;
+
+let commandsLocked = config.commandsLocked;
 
 if (!clientId || !guildId || !token || !webhookUrl) {
   console.error(
@@ -39,8 +44,13 @@ const client = new Client({
   ],
 });
 
-const dataFilePath = "./data.json";
 const webhookClient = new WebhookClient({ url: webhookUrl });
+
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+const dataFilePath = path.join(dataDir, 'data.json');
 
 let data = {};
 if (fs.existsSync(dataFilePath)) {
@@ -107,7 +117,7 @@ const commands = [
         .setDescription("The priority to assign")
         .setRequired(true);
 
-      config.roles.forEach((role) => {
+      roles.forEach((role) => {
         roleOption.addChoices({ name: role.name, value: role.value });
       });
 
@@ -186,220 +196,255 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
   const { commandName } = interaction;
+  const memberRoles = interaction.member.roles.cache.map((role) => role.id);
+  const hasAccess = memberRoles.some((role) => allowedRoles.includes(role));
 
-  if (commandsLocked) {
-    const memberRoles = interaction.member.roles.cache.map((role) => role.id);
-    const hasAccess = memberRoles.some((role) => allowedRoles.includes(role));
-    if (!hasAccess) {
-      return interaction.reply(
-        "You do not have permission to use this command."
-      );
-    }
+  if (commandsLocked && commandName !== "togglelock") {
+    return interaction.reply({
+      content: "Commands are currently locked. Only authorized users can toggle the lock.",
+      ephemeral: true,
+    });
   }
 
-  if (commandName === "givepriority") {
-    const user = interaction.options.getUser("user");
-    const roleId = interaction.options.getString("priority");
-    const duration = interaction.options.getString("time");
-    const executor = interaction.user;
+  if (!hasAccess) {
+    return interaction.reply({
+      content: "You do not have permission to use this command.",
+      ephemeral: true,
+    });
+  }
 
-    let milliseconds;
-    try {
-      milliseconds = parseDuration(duration);
-    } catch (error) {
-      return interaction.reply(
-        "Invalid time format. Use 1s, 1m, 1h, 1d, 1w, or 1mo."
+  try {
+    if (commandName === "givepriority") {
+      await interaction.deferReply();
+
+      const user = interaction.options.getUser("user");
+      const roleId = interaction.options.getString("priority");
+      const duration = interaction.options.getString("time");
+      const executor = interaction.user;
+
+      let milliseconds;
+      try {
+        milliseconds = parseDuration(duration);
+      } catch (error) {
+        return interaction.followUp(
+          "Invalid time format. Use 1s, 1m, 1h, 1d, 1w, or 1mo."
+        );
+      }
+
+      const guild = client.guilds.cache.get(guildId);
+
+      if (!guild) {
+        return interaction.followUp("Guild not found.");
+      }
+
+      // Check if bot has manage roles permission
+      if (!guild.members.me.permissions.has("MANAGE_ROLES")) {
+        return interaction.followUp("I do not have permission to manage roles.");
+      }
+
+      const member = await guild.members.fetch(user.id);
+      const role = guild.roles.cache.get(roleId);
+
+      if (!member || !role) {
+        return interaction.followUp("Invalid priority or role.");
+      }
+
+      // Check if the bot's highest role is higher than the role to assign
+      const botHighestRole = guild.members.me.roles.highest;
+      if (botHighestRole.position <= role.position) {
+        return interaction.followUp(
+          `I cannot assign the ${role.name} role because it is higher than or equal to my highest role.`
+        );
+      }
+
+      if (data[user.id]) {
+        return interaction.followUp(`${member.user.tag} already has a priority.`);
+      }
+
+      await member.roles.add(role);
+
+      const expireDate = new Date(Date.now() + milliseconds);
+      const expireTimestamp = Math.floor(expireDate.getTime() / 1000);
+
+      try {
+        await user.send(
+          `You have been given the ${role.name} priority for ${duration}. It will be active until <t:${expireTimestamp}:F>.`
+        );
+      } catch (error) {
+        console.error(`Could not send DM to ${user.tag}:`, error);
+      }
+
+      logToWebhook(
+        "Priority Given",
+        `Priority ${role.name} assigned to <@${member.user.id}> (ID: ${member.user.id}) \nfor ${duration} \nby <@${executor.id}> (ID: ${executor.id}).`,
+        "#0000FF"
       );
-    }
 
-    const guild = client.guilds.cache.get(guildId);
+      data[user.id] = { roleId: roleId, expireDate: expireDate.toISOString() };
+      saveData();
 
-    if (!guild) {
-      return interaction.reply("Guild not found.");
-    }
-
-    // Check if bot has manage roles permission
-    if (!guild.members.me.permissions.has('MANAGE_ROLES')) {
-      return interaction.reply('I do not have permission to manage roles.');
-    }
-
-    const member = await guild.members.fetch(user.id);
-    const role = guild.roles.cache.get(roleId);
-
-    if (!member || !role) {
-      return interaction.reply("Invalid priority or role.");
-    }
-
-    // Check if the bot's highest role is higher than the role to assign
-    const botHighestRole = guild.members.me.roles.highest;
-    if (botHighestRole.position <= role.position) {
-      return interaction.reply(`I cannot assign the ${role.name} role because it is higher than or equal to my highest role.`);
-    }
-
-    if (data[user.id]) {
-      return interaction.reply(`${member.user.tag} already has a priority.`);
-    }
-
-    await member.roles.add(role);
-    await interaction.reply(
-      `Priority ${role.name} has been assigned to ${member.user.tag} for ${duration} by ${executor.tag}.`
-    );
-
-    const expireDate = new Date(Date.now() + milliseconds);
-    const expireTimestamp = Math.floor(expireDate.getTime() / 1000);
-
-    try {
-      await user.send(
-        `You have been given the ${role.name} priority for ${duration}. It will be active until <t:${expireTimestamp}:F>.`
+      await interaction.followUp(
+        `Priority ${role.name} has been assigned to ${member.user.tag} for ${duration} by ${executor.tag}.`
       );
-    } catch (error) {
-      console.error(`Could not send DM to ${user.tag}:`, error);
-    }
+    } else if (commandName === "removepriority") {
+      await interaction.deferReply();
 
-    logToWebhook(
-      "Priority Given",
-      `Priority ${role.name} assigned to <@${member.user.id}> (ID: ${member.user.id}) for ${duration} by <@${executor.id}> (ID: ${executor.id}).`,
-      "#0000FF"
-    );
+      const user = interaction.options.getUser("user");
+      const executor = interaction.user;
 
-    data[user.id] = { roleId: roleId, expireDate: expireDate.toISOString() };
-    saveData();
-  } else if (commandName === "removepriority") {
-    const user = interaction.options.getUser("user");
-    const executor = interaction.user;
+      const guild = client.guilds.cache.get(guildId);
 
-    const guild = client.guilds.cache.get(guildId);
+      if (!guild) {
+        return interaction.followUp("Guild not found.");
+      }
 
-    if (!guild) {
-      return interaction.reply("Guild not found.");
-    }
+      // Check if bot has manage roles permission
+      if (!guild.members.me.permissions.has("MANAGE_ROLES")) {
+        return interaction.followUp("I do not have permission to manage roles.");
+      }
 
-    // Check if bot has manage roles permission
-    if (!guild.members.me.permissions.has('MANAGE_ROLES')) {
-      return interaction.reply('I do not have permission to manage roles.');
-    }
+      const member = await guild.members.fetch(user.id);
 
-    const member = await guild.members.fetch(user.id);
+      if (!data[user.id]) {
+        return interaction.followUp(
+          `${member.user.tag} does not have an assigned priority.`
+        );
+      }
 
-    if (!data[user.id]) {
-      return interaction.reply(
-        `${member.user.tag} does not have an assigned priority.`
+      const roleId = data[user.id].roleId;
+      const role = guild.roles.cache.get(roleId);
+
+      if (!role) {
+        return interaction.followUp("Priority not found.");
+      }
+
+      // Check if the bot's highest role is higher than the role to remove
+      const botHighestRole = guild.members.me.roles.highest;
+      if (botHighestRole.position <= role.position) {
+        return interaction.followUp(
+          `I cannot remove the ${role.name} role because it is higher than or equal to my highest role.`
+        );
+      }
+
+      await member.roles.remove(role);
+      delete data[user.id];
+      saveData();
+
+      await interaction.followUp(
+        `Priority ${role.name} has been removed from ${member.user.tag} by ${executor.tag}.`
       );
-    }
 
-    const roleId = data[user.id].roleId;
-    const role = guild.roles.cache.get(roleId);
+      logToWebhook(
+        "Priority Removed",
+        `Priority ${role.name} removed from <@${member.user.id}> (ID: ${member.user.id}) \nby <@${executor.id}> (ID: ${executor.id}).`,
+        "#FF0000"
+      );
+    } else if (commandName === "list") {
+      await interaction.deferReply();
 
-    if (!role) {
-      return interaction.reply("Priority not found.");
-    }
+      const page = interaction.options.getInteger("page") || 1;
+      const pageSize = 10;
 
-    // Check if the bot's highest role is higher than the role to remove
-    const botHighestRole = guild.members.me.roles.highest;
-    if (botHighestRole.position <= role.position) {
-      return interaction.reply(`I cannot remove the ${role.name} role because it is higher than or equal to my highest role.`);
-    }
+      const entries = Object.entries(data);
+      const totalEntries = entries.length;
+      const totalPages = Math.ceil(totalEntries / pageSize);
+      const paginatedEntries = entries.slice(
+        (page - 1) * pageSize,
+        page * pageSize
+      );
 
-    await member.roles.remove(role);
-    delete data[user.id];
-    saveData();
+      const embed = new EmbedBuilder()
+        .setTitle("Priority Assignments")
+        .setFooter({
+          text: `Page ${page} of ${totalPages} • Total: ${totalEntries} items`,
+        });
 
-    await interaction.reply(
-      `Priority ${role.name} has been removed from ${member.user.tag} by ${executor.tag}.`
-    );
-    logToWebhook(
-      "Priority Removed",
-      `Priority ${role.name} removed from <@${member.user.id}> (ID: ${member.user.id}) by <@${executor.id}> (ID: ${executor.id}).`,
-      "#FF0000"
-    );
-  } else if (commandName === "list") {
-    const page = interaction.options.getInteger("page") || 1;
-    const pageSize = 10;
+      for (const [userId, { roleId, expireDate }] of paginatedEntries) {
+        const member = await interaction.guild.members.fetch(userId);
+        const role = interaction.guild.roles.cache.get(roleId);
+        const remainingTime = Math.max(0, new Date(expireDate) - new Date());
+        const remainingSeconds = Math.ceil(remainingTime / 1000);
+        const expireTimestamp = Math.floor(
+          new Date(expireDate).getTime() / 1000
+        );
 
-    const entries = Object.entries(data);
-    const totalEntries = entries.length;
-    const totalPages = Math.ceil(totalEntries / pageSize);
-    const paginatedEntries = entries.slice(
-      (page - 1) * pageSize,
-      page * pageSize
-    );
+        embed.addFields({
+          name: ` ${member.user.tag}`,
+          value: `<@${member.user.id}>\nPriority: ${
+            role.name
+          }\nExpires in: ${formatDuration(remainingTime)}\nUser ID: ${
+            member.user.id
+          }\nExpires at: <t:${expireTimestamp}:F>`,
+          inline: true,
+        });
+      }
 
-    const embed = new EmbedBuilder()
-      .setTitle("Priority Assignments")
-      .setFooter({
-        text: `Page ${page} of ${totalPages} • Total: ${totalEntries} items`,
-      });
+      await interaction.followUp({ embeds: [embed] });
+    }else if (commandName === "togglelock") {
+      await interaction.deferReply(); 
+  
+      commandsLocked = !commandsLocked;
+      // Update the state in the state.json file
+      const stateFilePath = path.join(__dirname, 'state.json');
+      fs.writeFileSync(stateFilePath, JSON.stringify({ commandsLocked }, null, 2));
+  
+      await interaction.followUp(
+          `Command lock is now ${commandsLocked ? "enabled" : "disabled"}.`
+      );
+    }else if (commandName === "checkplayer") {
+      await interaction.deferReply();
 
-    for (const [userId, { roleId, expireDate }] of paginatedEntries) {
-      const member = await interaction.guild.members.fetch(userId);
-      const role = interaction.guild.roles.cache.get(roleId);
+      const user = interaction.options.getUser("user");
+
+      const guild = client.guilds.cache.get(guildId);
+
+      if (!guild) {
+        return interaction.followUp("Guild not found.");
+      }
+
+      const member = await guild.members.fetch(user.id);
+
+      if (!member) {
+        return interaction.followUp("User not found in the guild.");
+      }
+
+      if (!data[user.id]) {
+        return interaction.followUp(
+          `${member.user.tag} does not have any assigned priority.`
+        );
+      }
+
+      const { roleId, expireDate } = data[user.id];
+      const role = guild.roles.cache.get(roleId);
+
+      if (!role) {
+        return interaction.followUp("Priority role not found.");
+      }
+
       const remainingTime = Math.max(0, new Date(expireDate) - new Date());
-      const remainingSeconds = Math.ceil(remainingTime / 1000);
-      const expireTimestamp = Math.floor(new Date(expireDate).getTime() / 1000);
-
-      embed.addFields({
-        name: ` ${member.user.tag}`,
-        value: `<@${member.user.id}>\nPriority: ${
-          role.name
-        }\nExpires in: ${formatDuration(remainingTime)}\nUser ID: ${
-          member.user.id
-        }\nExpires at: <t:${expireTimestamp}:F>`,
-        inline: true,
-      });
-    }
-
-    await interaction.reply({ embeds: [embed] });
-  } else if (commandName === "togglelock") {
-    commandsLocked = !commandsLocked;
-    await interaction.reply(
-      `Command lock is now ${commandsLocked ? "enabled" : "disabled"}.`
-    );
-  } else if (commandName === "checkplayer") {
-    const user = interaction.options.getUser("user");
-
-    const guild = client.guilds.cache.get(guildId);
-
-    if (!guild) {
-      return interaction.reply("Guild not found.");
-    }
-
-    const member = await guild.members.fetch(user.id);
-
-    if (!member) {
-      return interaction.reply("User not found in the guild.");
-    }
-
-    if (!data[user.id]) {
-      return interaction.reply(
-        `${member.user.tag} does not have any assigned priority.`
+      const expireTimestamp = Math.floor(
+        new Date(expireDate).getTime() / 1000
       );
+
+      const embed = new EmbedBuilder()
+        .setTitle("Priority Status")
+        .setDescription(
+          `<@${member.user.id}> (${member.user.tag}) has the ${role.name} priority.`
+        )
+        .addFields({
+          name: "Expires in",
+          value: `${formatDuration(
+            remainingTime
+          )}\nExpires at: <t:${expireTimestamp}:F>`,
+        })
+        .setColor("#00FF00")
+        .setTimestamp();
+
+      await interaction.followUp({ embeds: [embed] });
     }
-
-    const { roleId, expireDate } = data[user.id];
-    const role = guild.roles.cache.get(roleId);
-
-    if (!role) {
-      return interaction.reply("Priority role not found.");
-    }
-
-    const remainingTime = Math.max(0, new Date(expireDate) - new Date());
-    const expireTimestamp = Math.floor(new Date(expireDate).getTime() / 1000);
-
-    const embed = new EmbedBuilder()
-      .setTitle("Priority Status")
-      .setDescription(
-        `<@${member.user.id}> (${member.user.tag}) has the ${role.name} priority.`
-      )
-      .addFields({
-        name: "Expires in",
-        value: `${formatDuration(
-          remainingTime
-        )}\nExpires at: <t:${expireTimestamp}:F>`,
-      })
-      .setColor("#00FF00")
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error(error);
+    await interaction.followUp("An error occurred while processing your command.");
   }
 });
 
@@ -435,7 +480,7 @@ async function checkRoles() {
           );
           logToWebhook(
             "Priority Removed",
-            `Removed priority ${role.name} from <@${member.user.id}> (ID: ${member.user.id})`,
+            `Removed priority ${role.name} \nfrom <@${member.user.id}> (ID: ${member.user.id})`,
             "#FF0000"
           );
         } else {
@@ -460,7 +505,7 @@ function logToWebhook(title, description, color) {
 
   webhookClient
     .send({ embeds: [embed] })
-    .then(() => console.log("Log sent to webhook"))
+    .then()
     .catch(console.error);
 }
 

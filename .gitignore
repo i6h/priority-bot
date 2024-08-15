@@ -6,3 +6,4 @@ node_modules/
 
 # Data files
 data.json
+state.json
